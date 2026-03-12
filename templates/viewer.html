@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}{{ file_name }} | Visor{% endblock %}
+
+{% block content %}
+<div class="viewer-shell" data-pdf-url="{{ pdf_url }}">
+  <header class="viewer-topbar">
+    <div class="left-actions">
+      <a class="btn" href="{{ url_for('home') }}">Inicio</a>
+      <a class="btn" href="{{ url_for('home', relative_path=back_to_folder) if back_to_folder else url_for('home') }}">Atrás</a>
+    </div>
+
+    <div class="search-group">
+      <input id="searchInput" type="search" placeholder="Buscar texto en el PDF" />
+      <button id="searchPrev" class="btn icon-btn" title="Resultado anterior">↑</button>
+      <button id="searchNext" class="btn icon-btn" title="Resultado siguiente">↓</button>
+      <span id="searchStatus">0/0</span>
+    </div>
+
+    <div class="page-info">
+      <span id="pageCounter">Página 1</span>
+    </div>
+  </header>
+
+  <main class="viewer-main">
+    <button class="nav-arrow" id="prevPage" title="Página anterior">‹</button>
+
+    <section class="book-stage" id="bookStage">
+      <canvas id="pdfCanvas"></canvas>
+      <div id="matchHint" class="match-hint hidden"></div>
+    </section>
+
+    <button class="nav-arrow" id="nextPage" title="Página siguiente">›</button>
+  </main>
+</div>
+
+<script type="module" src="{{ url_for('static', filename='js/viewer.js') }}"></script>
+{% endblock %}

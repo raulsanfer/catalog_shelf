@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Inicio | Visor de Catálogos{% endblock %}
+
+{% block content %}
+<div class="home-wrap">
+  <header class="home-header">
+    <img src="{{ url_for('static', filename=home_logo) }}" class="home-logo" alt="Logo" />
+  </header>
+
+  <section class="toolbar">
+    <nav class="breadcrumbs">
+      {% for crumb in breadcrumbs %}
+        {% if loop.last %}
+          <span>{{ crumb.label }}</span>
+        {% else %}
+          <a href="{{ url_for('home', relative_path=crumb.path) if crumb.path else url_for('home') }}">{{ crumb.label }}</a>
+          <span class="sep">/</span>
+        {% endif %}
+      {% endfor %}
+    </nav>
+
+    <div class="nav-buttons">
+      {% if parent_path is not none %}
+        <a class="btn" href="{{ url_for('home', relative_path=parent_path) if parent_path else url_for('home') }}">Atrás</a>
+      {% endif %}
+      <a class="btn" href="{{ url_for('home') }}">Inicio</a>
+    </div>
+  </section>
+
+  <main class="grid">
+    {% for folder in folders %}
+      <a class="card folder" href="{{ url_for('home', relative_path=folder.path) }}" aria-label="Abrir carpeta {{ folder.name }}">
+        <span class="icon">📁</span>
+        <span class="label">{{ folder.name }}</span>
+      </a>
+    {% endfor %}
+
+    {% for file in files %}
+      <a class="card file" href="{{ url_for('viewer', file_path=file.path) }}" aria-label="Abrir archivo {{ file.name }}">
+        <span class="icon">📕</span>
+        <span class="label">{{ file.name }}</span>
+      </a>
+    {% endfor %}
+
+    {% if not folders and not files %}
+      <p class="empty">No hay carpetas ni PDFs en esta ruta.</p>
+    {% endif %}
+  </main>
+</div>
+{% endblock %}
