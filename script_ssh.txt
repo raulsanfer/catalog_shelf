@@ -1,0 +1,37 @@
+Sí, se puede. Ya dejé preparado un script de bootstrap y los cambios mínimos para que tu app se ejecute bien en contenedor y soporte el catálogo desde USB. Resumen de lo que añadí:
+
+Cambios en el repo
+
+Dockerfile con base arm32v6/python:3.11-slim-bullseye.
+.dockerignore para no meter catalog/, venv/, etc.
+config.py ahora acepta BASE_CATALOG_PATH, HOST, PORT, DEBUG por variables de entorno.
+scripts/pi_setup.sh con instalación completa (Docker, kiosk, auto‑mount del USB por LABEL=CatalogPen, servicio systemd).
+Archivos:
+
+Dockerfile
+.dockerignore
+config.py
+scripts/pi_setup.sh
+Cómo usarlo en la Raspberry (por SSH)
+
+Opción A (sin clonar repo, descargando el script):
+
+curl -fsSL https://raw.githubusercontent.com/raulsanfer/catalog_shelf/main/scripts/pi_setup.sh | sudo bash
+Opción B (clonando repo):
+
+git clone https://github.com/raulsanfer/catalog_shelf.git
+cd catalog_shelf
+sudo ./scripts/pi_setup.sh
+Qué hace el script
+
+Instala Docker + entorno gráfico mínimo + Chromium en modo kiosk.
+Monta el USB por LABEL=CatalogPen en /mnt/catalogo.
+Construye la imagen Docker localmente desde el repo.
+Crea showcatalog.service (contenedor) y kiosk.service (pantalla completa).
+Deja todo listo para que al reiniciar se abra la app en http://localhost:8080.
+Notas importantes
+
+El USB queda montado como solo‑lectura dentro del contenedor (:ro). Si quieres escritura desde la Pi, cambia a :rw en scripts/pi_setup.sh.
+Construir en la Pi Zero es lento; es lo esperado.
+La app quedará en kiosk sin salida fácil (como pediste).
+Si quieres ajustar algo (ruta, puerto, nombre del label, modo lectura/escritura), lo edito en scripts/pi_setup.sh.

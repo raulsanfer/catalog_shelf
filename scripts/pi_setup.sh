@@ -9,7 +9,7 @@ USB_LABEL="CatalogPen"
 MOUNT_DIR="/mnt/catalogo"
 HOST_PORT="8080"
 CONTAINER_PORT="5000"
-KIOSK_USER="pi"
+KIOSK_USER="piuser"
 
 if [ "$(id -u)" -ne 0 ]; then
   echo "Run as root (use sudo)."
