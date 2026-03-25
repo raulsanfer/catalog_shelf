@@ -30,7 +30,7 @@ apt-get install -y --no-install-recommends \
   xserver-xorg-legacy \
   xinit \
   openbox \
-  chromium-browser \
+  chromium \
   unclutter \
   x11-xserver-utils \
   fonts-dejavu-core
