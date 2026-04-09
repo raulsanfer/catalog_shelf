@@ -3,12 +3,10 @@ set -euo pipefail
 
 REPO_URL="https://github.com/raulsanfer/catalog_shelf.git"
 APP_DIR="/opt/showcatalog"
-IMAGE_NAME="showcatalog:local"
-CONTAINER_NAME="showcatalog"
 USB_LABEL="CatalogPen"
 MOUNT_DIR="/mnt/catalogo"
 HOST_PORT="8080"
-CONTAINER_PORT="5000"
+APP_PORT="5000"
 KIOSK_USER="piuser"
 
 if [ "$(id -u)" -ne 0 ]; then
@@ -25,7 +23,8 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y --no-install-recommends \
   git \
-  docker.io \
+  python3 \
+  python3-pip \
   xserver-xorg \
   xserver-xorg-legacy \
   xinit \
@@ -35,9 +34,7 @@ apt-get install -y --no-install-recommends \
   x11-xserver-utils \
   fonts-dejavu-core
 
-systemctl enable --now docker
-usermod -aG docker "$KIOSK_USER"
-
+# --- USB automount ---
 mkdir -p "$MOUNT_DIR"
 if ! grep -q "LABEL=${USB_LABEL}" /etc/fstab; then
   echo "LABEL=${USB_LABEL} ${MOUNT_DIR} vfat nofail,x-systemd.automount,x-systemd.device-timeout=10,uid=${KIOSK_USER},gid=${KIOSK_USER},umask=0022 0 0" >> /etc/fstab
@@ -45,6 +42,7 @@ fi
 systemctl daemon-reload
 systemctl restart remote-fs.target || true
 
+# --- Clone or update app ---
 if [ -d "${APP_DIR}/.git" ]; then
   git -C "$APP_DIR" pull --ff-only
 else
@@ -52,27 +50,23 @@ else
   git clone "$REPO_URL" "$APP_DIR"
 fi
 
-docker build -t "$IMAGE_NAME" "$APP_DIR"
+# --- Install Python dependencies ---
+if [ -f "${APP_DIR}/requirements.txt" ]; then
+  pip3 install -r "${APP_DIR}/requirements.txt"
+fi
 
+# --- Create app service ---
 cat > /etc/systemd/system/showcatalog.service <<EOF
 [Unit]
-Description=ShowCatalog container
-After=docker.service
-Wants=docker.service
+Description=ShowCatalog Python App
+After=network.target remote-fs.target
 
 [Service]
+User=${KIOSK_USER}
+WorkingDirectory=${APP_DIR}
+ExecStart=/usr/bin/python3 ${APP_DIR}/app.py
 Restart=always
-ExecStartPre=-/usr/bin/docker rm -f ${CONTAINER_NAME}
-ExecStart=/usr/bin/docker run --name ${CONTAINER_NAME} --restart=always \
-  -p ${HOST_PORT}:${CONTAINER_PORT} \
-  -v ${MOUNT_DIR}:/app/catalog:ro \
-  -e BASE_CATALOG_PATH=/app/catalog \
-  -e HOST=0.0.0.0 \
-  -e PORT=${CONTAINER_PORT} \
-  -e DEBUG=0 \
-  ${IMAGE_NAME}
-ExecStop=/usr/bin/docker stop ${CONTAINER_NAME}
-TimeoutStopSec=20
+Environment=PORT=${APP_PORT}
 
 [Install]
 WantedBy=multi-user.target
@@ -81,31 +75,45 @@ EOF
 systemctl daemon-reload
 systemctl enable --now showcatalog.service
 
+# --- X init config ---
 cat > "/home/${KIOSK_USER}/.xinitrc" <<'EOF'
 #!/bin/sh
 xset -dpms
 xset s off
 xset s noblank
+
 unclutter -idle 0.1 -root &
 openbox-session &
-chromium-browser \
+
+# Wait for app to be ready
+sleep 5
+
+chromium \
   --kiosk \
   --incognito \
   --noerrdialogs \
   --disable-session-crashed-bubble \
   --disable-infobars \
   --check-for-update-interval=31536000 \
+  --disable-gpu \
+  --disable-dev-shm-usage \
+  --no-sandbox \
+  --disable-extensions \
+  --disable-features=TranslateUI \
+  --disable-software-rasterizer \
   http://localhost:8080
 EOF
 
 chown "${KIOSK_USER}:${KIOSK_USER}" "/home/${KIOSK_USER}/.xinitrc"
 chmod +x "/home/${KIOSK_USER}/.xinitrc"
 
+# --- X wrapper config ---
 cat > /etc/X11/Xwrapper.config <<'EOF'
 allowed_users=anybody
 needs_root_rights=yes
 EOF
 
+# --- Kiosk service ---
 cat > /etc/systemd/system/kiosk.service <<EOF
 [Unit]
 Description=Kiosk mode
@@ -116,19 +124,14 @@ Wants=network-online.target
 User=${KIOSK_USER}
 Environment=DISPLAY=:0
 WorkingDirectory=/home/${KIOSK_USER}
-ExecStart=/usr/bin/startx
+ExecStart=/usr/bin/startx /home/${KIOSK_USER}/.xinitrc -- :0 vt1 -nocursor
 Restart=always
 RestartSec=2
-TTYPath=/dev/tty1
-StandardInput=tty
-StandardOutput=journal
-StandardError=journal
 
 [Install]
 WantedBy=graphical.target
 EOF
 
-systemctl disable --now getty@tty1.service
 systemctl daemon-reload
 systemctl enable kiosk.service
 systemctl set-default graphical.target
